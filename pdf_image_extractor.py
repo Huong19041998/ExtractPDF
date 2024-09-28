@@ -21,7 +21,7 @@ class PDFImageExtractor:
         self.captions_dict = {}  # Dictionary to store captions for each image
 
     def prepare_directories(self):
-        """Tạo các thư mục output và tracing nếu chưa có."""
+        """Create output and tracing directories if they don't exist."""
         Path(self.output_dir).mkdir(exist_ok=True)
         if self.tracing_enabled:
             Path(self.tracing_dir).mkdir(exist_ok=True)
