@@ -9,7 +9,7 @@ from paddleocr import PaddleOCR
 import numpy as np
 
 class PDFImageExtractor:
-    def __init__(self, pdf_path, output_dir='images', tracing_enabled=True, tracing_dir='tracing'):
+    def __init__(self, pdf_path, output_dir='images', tracing_enabled=True, tracing_dir='tracing', use_pymupdf_for_caption=True):
         self.pdf_path = pdf_path
         self.output_dir = output_dir
         self.tracing_enabled = tracing_enabled
@@ -19,7 +19,7 @@ class PDFImageExtractor:
         self.caption_ratio = 0.25  #Ratio for determining the caption area below images
         self.images_dict = {}  # Dictionary to store extracted images
         self.captions_dict = {}  # Dictionary to store captions for each image
-
+        self.use_pymupdf_for_caption = use_pymupdf_for_caption
     def prepare_directories(self):
         """Create output and tracing directories if they don't exist."""
         Path(self.output_dir).mkdir(exist_ok=True)
@@ -119,7 +119,8 @@ class PDFImageExtractor:
             img_page = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width,
                                                                           pix.n)  # Convert the pixmap to a numpy array
             img_page = cv2.cvtColor(img_page, cv2.COLOR_RGB2BGR)  # Convert the image from RGB to BGR color space
-
+            if self.use_pymupdf_for_caption:
+                captions_page,caption_boxes = self.extract_captions_with_pymupdf(page)
             for img_index, img in enumerate(images):  # Iterate over each image found on the page
                 rect = page.get_image_rects(img)[0]  # Get the rectangle coordinates of the image
                 x0, y0, x1, y1 = int(rect.x0), int(rect.y0), int(rect.x1), int(
@@ -145,12 +146,22 @@ class PDFImageExtractor:
                 # Save the cropped image and caption image
                 image_filename = os.path.join(self.output_dir, f'page_{page_num + 1}_cropped_image_{img_index + 1}.png')
                 cv2.imwrite(image_filename, cropped_image)
-                # image_filename_cap = os.path.join(self.output_dir,
-                #                                   f'page_{page_num + 1}_cropped_image_cap_{img_index + 1}.png')
-                # cv2.imwrite(image_filename_cap, cropped_cap_image)
+                image_filename_cap = os.path.join(self.output_dir,
+                                                  f'page_{page_num + 1}_cropped_image_cap_{img_index + 1}.png')
+                cv2.imwrite(image_filename_cap, cropped_cap_image)
 
                 # Extract the caption from the cropped caption image
-                caption = self.extract_caption_from_image(cropped_cap_image)
+                if self.use_pymupdf_for_caption:
+                    caption = []
+                    for index_cap ,caption_box in enumerate(caption_boxes):
+                        if self.is_text_caption_for_image((x0, y0, x1, y1), caption_box):
+                            caption.append(captions_page[index_cap])
+
+                else:
+                    caption = self.extract_caption_from_image(cropped_cap_image)
+
+
+
                 self.images_dict[f"page_{page_num + 1}_{img_index + 1}"] = cropped_cap_image  # Store the cropped image
                 self.captions_dict[f"page_{page_num + 1}_{img_index + 1}"] = caption  # Store the caption
 
@@ -201,6 +212,50 @@ class PDFImageExtractor:
         if self.tracing_enabled:
             trace_image = os.path.join(self.tracing_dir, f"page_{index_page + 1}_trace.png")
             cv2.imwrite(trace_image, image_page)  # Save the trace image
+    def extract_captions_with_pymupdf(self, page):
+        """Extract captions based on the image positions using PyMuPDF."""
+        captions_page = []
+        box_captions = []
+        text_instances = page.get_text("dict")
+
+        # Loop through the text instances to find captions
+        for block in text_instances['blocks']:
+            if block['type'] == 0:  # Type 0 means it's a text block
+                for line in block['lines']:
+                    for span in line['spans']:
+                        text = span['text']
+                        bbox = span['bbox']
+                        captions_page.append(text)
+                        box_captions.append(bbox)
+
+        return captions_page,box_captions
+
+    def is_text_caption_for_image(self,image_box, text_box):
+        """
+        Check if a text_box is a caption for an image_box
+        based on position criteria.
+
+        image_box: tuple (x0_img, y0_img, x1_img, y1_img) - Bounding box of the image.
+        text_box: tuple (x0_text, y0_text, x1_text, y1_text) - Bounding box of the text.
+        threshold: percentage of the image height that the caption's top y-coordinate should not exceed.
+
+        Returns:
+            True if the text_box is a caption for the image_box, False otherwise.
+        """
+        threshold = self.caption_ratio
+        # Unpack the coordinates of the image_box and text_box
+        x0_img, y0_img, x1_img, y1_img = image_box
+        x0_text, y0_text, x1_text, y1_text = text_box
+
+        # Condition 1: Check if the text_box is below the image_box
+        if y1_img <= y0_text <= y1_img +  int((y1_img - y0_img) * self.caption_ratio) and x0_img - 100 <=  x0_text <= + 100 :
+            # Calculate the height of the image_box
+            image_height = y1_img - y0_img
+            # Condition 2:  Check if the height of the text_box does not exceed 25% of the image_box height
+            if (y1_text - y0_text) <= threshold * image_height:
+                return True
+
+        return False
 
     def extract_caption_from_image(self, image):
         """Use PaddleOCR to recognize captions from the image."""
@@ -248,6 +303,8 @@ def main():
     parser.add_argument('--output_dir', type=str, default='images', help='Thư mục để lưu hình ảnh đã trích xuất.')
     parser.add_argument('--tracing_enabled', action='store_true', help='Bật chế độ tracing.')
     parser.add_argument('--tracing_dir', type=str, default='tracing', help='Thư mục để lưu ảnh tracing.')
+    parser.add_argument('--use_pymupdf_for_caption', type=bool, default=True,
+                        help='If True, use PyMuPDF to extract captions for images.')
 
     args = parser.parse_args()
 
@@ -255,7 +312,8 @@ def main():
         pdf_path=args.pdf_path,
         output_dir=args.output_dir,
         tracing_enabled=args.tracing_enabled,
-        tracing_dir=args.tracing_dir
+        tracing_dir=args.tracing_dir,
+        use_pymupdf_for_caption =args.use_pymupdf_for_caption
     )
     images_dict, captions_dict = extractor.process_pdf()
     print("captions_dict", captions_dict)
