@@ -20,11 +20,6 @@ class PDFImageExtractor:
         self.images_dict = {}  # Dictionary to store extracted images
         self.captions_dict = {}  # Dictionary to store captions for each image
         self.use_pymupdf_for_caption = use_pymupdf_for_caption
-    def prepare_directories(self):
-        """Create output and tracing directories if they don't exist."""
-        Path(self.output_dir).mkdir(exist_ok=True)
-        if self.tracing_enabled:
-            Path(self.tracing_dir).mkdir(exist_ok=True)
 
     def prepare_directories(self):
         """Create output and tracing directories if they do not exist."""
@@ -172,7 +167,7 @@ class PDFImageExtractor:
         minimum_width = 100  # Minimum width for the bounding rectangle of detected images
         minimum_height = 100  # Minimum height for the bounding rectangle of detected images
         # image = cv2.imread(image_page)
-        original = image_page.copy()
+        # original = image_page.copy()
         gray = cv2.cvtColor(image_page, cv2.COLOR_BGR2GRAY)  # Convert the image to grayscale
         thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]  # Apply thresholding to create a binary image
 
@@ -181,7 +176,7 @@ class PDFImageExtractor:
         for c in cnts:  # Iterate over each contour found
             x0, y0, w, h = cv2.boundingRect(c)  # Get the bounding rectangle for the contour
             x1, y1 = x0 + w, y0 + h  # Calculate the bottom-right coordinates of the bounding rectangle
-
+            cropped_image = image_page[y0:y1, x0:x1]
             # Calculate the height for the caption area
             caption_height = int(h * self.caption_ratio)
             y2_caption = y0 + h + caption_height
@@ -199,12 +194,12 @@ class PDFImageExtractor:
                 #                              f'page_{index_page + 1}_cap_{cropped_cap_image_number}.png')
                 # cv2.imwrite(out_image_cap, cropped_cap_image)  # Save the cropped caption image
                 out_image = os.path.join(self.output_dir, f'page_{index_page + 1}_{cropped_cap_image_number}.png')
-                cv2.imwrite(out_image, original[y0:y1, x0:x1])  # Save the original cropped image
+                cv2.imwrite(out_image, cropped_image)  # Save the original cropped image
 
                 # Extract the caption from the cropped caption image
                 caption = self.extract_caption_from_image(cropped_cap_image)
                 self.images_dict[
-                    f"page_{index_page + 1}_{cropped_cap_image_number}"] = cropped_cap_image  # Store the cropped caption image
+                    f"page_{index_page + 1}_{cropped_cap_image_number}"] = cropped_image  # Store the cropped caption image
                 self.captions_dict[f"page_{index_page + 1}_{cropped_cap_image_number}"] = caption  # Store the caption
                 cropped_cap_image_number += 1  # Increment the cropped caption image counter
 
