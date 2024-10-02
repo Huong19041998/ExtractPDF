@@ -300,11 +300,11 @@ class PDFImageExtractor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Trích xuất hình ảnh và chú thích từ PDF.")
-    parser.add_argument('pdf_path', type=str, help='Đường dẫn tới file PDF.')
-    parser.add_argument('--output_dir', type=str, default='images', help='Thư mục để lưu hình ảnh đã trích xuất.')
-    parser.add_argument('--tracing_enabled', action='store_true', help='Bật chế độ tracing.')
-    parser.add_argument('--tracing_dir', type=str, default='tracing', help='Thư mục để lưu ảnh tracing.')
+    parser = argparse.ArgumentParser(description="Extract images and captions from a PDF.")
+    parser.add_argument('pdf_path', type=str, help='Path to the PDF file.')
+    parser.add_argument('--output_dir', type=str, default='images', help='Directory to save extracted images.')
+    parser.add_argument('--tracing_enabled', action='store_true', help='Enable tracing mode.')
+    parser.add_argument('--tracing_dir', type=str, default='tracing', help='Directory to save tracing images.')
     parser.add_argument('--use_pymupdf_for_caption', type=bool, default=True,
                         help='If True, use PyMuPDF to extract captions for images.')
 
