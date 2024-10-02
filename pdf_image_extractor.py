@@ -166,7 +166,7 @@ class PDFImageExtractor:
 
 
 
-                self.images_dict[f"page_{page_num + 1}_{img_index + 1}"] = cropped_cap_image  # Store the cropped image
+                self.images_dict[f"page_{page_num + 1}_{img_index + 1}"] = cropped_image  # Store the cropped image
                 self.captions_dict[f"page_{page_num + 1}_{img_index + 1}"] = caption  # Store the caption
 
         doc.close()  # Close the PDF document
