@@ -7,6 +7,7 @@ from PyPDF2 import PdfReader
 import argparse
 from paddleocr import PaddleOCR
 import numpy as np
+import sys
 
 class PDFImageExtractor:
     def __init__(self, pdf_path, output_dir='images', tracing_enabled=True, tracing_dir='tracing', use_pymupdf_for_caption=True):
@@ -31,15 +32,23 @@ class PDFImageExtractor:
 
     def get_pdf_metadata(self):
         """Retrieve metadata from the PDF file."""
-        with open(self.pdf_path, "rb") as f:
-            pdf = PdfReader(f)
-            info = pdf.metadata
-            return {
-                'creator': info.get('/Creator', ''),
-                'producer': info.get('/Producer', ''),
-                'creation_date': info.get('/CreationDate', ''),
-                'mod_date': info.get('/ModDate', '')
-            }
+        try:
+            with open(self.pdf_path, "rb") as f:
+                pdf = PdfReader(f)
+                info = pdf.metadata
+                return {
+                    'creator': info.get('/Creator', ''),
+                    'producer': info.get('/Producer', ''),
+                    'creation_date': info.get('/CreationDate', ''),
+                    'mod_date': info.get('/ModDate', '')
+                }
+        except FileNotFoundError:
+            print(f"File {self.pdf_path} not found.")
+            sys.exit(1)
+            return {}
+        except Exception as e:
+            print(f"Error reading PDF metadata: {e}")
+            return {}
 
     def is_pdf_scan_based_on_metadata(self, metadata):
         """Determine if the PDF is scanned based on its metadata."""
