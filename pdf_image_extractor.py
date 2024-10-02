@@ -8,6 +8,7 @@ import argparse
 from paddleocr import PaddleOCR
 import numpy as np
 import sys
+from typing import Optional
 
 class PDFImageExtractor:
     def __init__(self, pdf_path, output_dir='images', tracing_enabled=True, tracing_dir='tracing', use_pymupdf_for_caption=True):
@@ -30,7 +31,7 @@ class PDFImageExtractor:
         if self.tracing_enabled:
             Path(self.tracing_dir).mkdir(exist_ok=True)
 
-    def get_pdf_metadata(self):
+    def get_pdf_metadata(self)-> dict:
         """Retrieve metadata from the PDF file."""
         try:
             with open(self.pdf_path, "rb") as f:
@@ -50,7 +51,7 @@ class PDFImageExtractor:
             print(f"Error reading PDF metadata: {e}")
             return {}
 
-    def is_pdf_scan_based_on_metadata(self, metadata):
+    def is_pdf_scan_based_on_metadata(self, metadata) -> Optional[bool]:
         """Determine if the PDF is scanned based on its metadata."""
         scanners = ['TOSHIBA e-STUDIO', 'Canon', 'HP ScanJet', 'Epson']
         office_tools = ['Microsoft Office Word', 'Adobe Acrobat', 'LibreOffice']
@@ -69,7 +70,7 @@ class PDFImageExtractor:
 
         return None  # Unknown
 
-    def is_pdf_scan_based_on_content(self):
+    def is_pdf_scan_based_on_content(self) -> Optional[bool]:
         """Determine if the PDF is scanned based on its content."""
         doc = fitz.open(self.pdf_path)
 
@@ -87,7 +88,7 @@ class PDFImageExtractor:
 
         return None  # Unknown
 
-    def is_pdf_scan_with_ocr(self):
+    def is_pdf_scan_with_ocr(self) -> bool:
         """Determine if the PDF is scanned by performing OCR on its images."""
         images = self.convert_pdf_to_images()
         for image in images:
@@ -96,7 +97,7 @@ class PDFImageExtractor:
                 return False  # OCR found text, likely not a scan
         return True  # OCR did not find text, likely a scan
 
-    def is_pdf_scan(self):
+    def is_pdf_scan(self) -> bool:
         """Determine if the PDF is scanned using various methods."""
         metadata = self.get_pdf_metadata()
         # Check based on metadata
@@ -160,11 +161,8 @@ class PDFImageExtractor:
                     for index_cap ,caption_box in enumerate(caption_boxes):
                         if self.is_text_caption_for_image((x0, y0, x1, y1), caption_box):
                             caption.append(captions_page[index_cap])
-
                 else:
                     caption = self.extract_caption_from_image(cropped_cap_image)
-
-
 
                 self.images_dict[f"page_{page_num + 1}_{img_index + 1}"] = cropped_image  # Store the cropped image
                 self.captions_dict[f"page_{page_num + 1}_{img_index + 1}"] = caption  # Store the caption
@@ -216,7 +214,7 @@ class PDFImageExtractor:
         if self.tracing_enabled:
             trace_image = os.path.join(self.tracing_dir, f"page_{index_page + 1}_trace.png")
             cv2.imwrite(trace_image, image_page)  # Save the trace image
-    def extract_captions_with_pymupdf(self, page):
+    def extract_captions_with_pymupdf(self, page: fitz.Page) -> tuple[list[str], list[float]]:
         """Extract captions based on the image positions using PyMuPDF."""
         captions_page = []
         box_captions = []
@@ -234,7 +232,7 @@ class PDFImageExtractor:
 
         return captions_page,box_captions
 
-    def is_text_caption_for_image(self,image_box, text_box):
+    def is_text_caption_for_image(self,image_box, text_box)-> bool:
         """
         Check if a text_box is a caption for an image_box
         based on position criteria.
@@ -261,7 +259,7 @@ class PDFImageExtractor:
 
         return False
 
-    def extract_caption_from_image(self, image):
+    def extract_caption_from_image(self, image) -> Optional[str]:
         """Use PaddleOCR to recognize captions from the image."""
         result = self.ocr.ocr(image, cls=True)
         captions = []
